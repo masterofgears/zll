@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Запись к мастеру</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        .subtitle {
+            color: var(--tg-theme-hint-color, #999);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        /* Календарь */
+        .calendar {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .calendar-header button {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .calendar-month {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .calendar-day-name {
+            text-align: center;
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999);
+            padding: 8px 0;
+            font-weight: 600;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            position: relative;
+            background: var(--tg-theme-bg-color, #ffffff);
+        }
+
+        .calendar-day.available {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .calendar-day.available:hover {
+            background: #c3e6cb;
+        }
+
+        .calendar-day.unavailable {
+            background: #f8d7da;
+            color: #721c24;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .calendar-day.selected {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            font-weight: 600;
+        }
+
+        .calendar-day.empty {
+            background: transparent;
+            cursor: default;
+        }
+
+        /* Временные слоты */
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .time-slot {
+            padding: 15px;
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            transition: all 0.2s;
+        }
+
+        .time-slot:hover {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        .time-slot.selected {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        .time-slot.unavailable {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: #ccc;
+        }
+
+        /* Кнопки выбора */
+        .options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .option-btn {
+            padding: 12px;
+            border: 2px solid var(--tg-theme-hint-color, #ccc);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            transition: all 0.2s;
+        }
+
+        .option-btn:hover {
+            border-color: var(--tg-theme-button-color, #3390ec);
+        }
+
+        .option-btn.selected {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border-color: var(--tg-theme-button-color, #3390ec);
+        }
+
+        /* Формы ввода */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--tg-theme-hint-color, #ccc);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--tg-theme-button-color, #3390ec);
+        }
+
+        textarea.form-input {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        /* Чекбокс */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border: 2px solid var(--tg-theme-hint-color, #ccc);
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            background: var(--tg-theme-bg-color, #ffffff);
+        }
+
+        .checkbox-group.checked {
+            border-color: var(--tg-theme-button-color, #3390ec);
+            background: rgba(51, 144, 236, 0.1);
+        }
+
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+
+        /* Навигация */
+        .navigation {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-btn.secondary {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        .nav-btn.primary {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Сводка */
+        .summary {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-label {
+            font-weight: 600;
+        }
+
+        .summary-value {
+            color: var(--tg-theme-hint-color, #666);
+        }
+
+        /* Прогресс */
+        .progress {
+            height: 4px;
+            background: var(--tg-theme-hint-color, #ddd);
+            border-radius: 2px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--tg-theme-button-color, #3390ec);
+            transition: width 0.3s;
+        }
+
+        .error {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 Запись на наращивание</h1>
+        <p class="subtitle">Заполните форму для записи</p>
+
+        <!-- Прогресс -->
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- Шаг 1: Выбор даты -->
+        <div class="step active" id="step1">
+            <div class="step-title">Шаг 1 из 7: Выберите дату</div>
+            <div class="calendar">
+                <div class="calendar-header">
+                    <button onclick="changeMonth(-1)">‹</button>
+                    <div class="calendar-month" id="calendarMonth"></div>
+                    <button onclick="changeMonth(1)">›</button>
+                </div>
+                <div class="calendar-grid" id="calendarGrid"></div>
+            </div>
+            <div class="navigation">
+                <button class="nav-btn primary" id="nextStep1" onclick="nextStep()" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Шаг 2: Выбор времени -->
+        <div class="step" id="step2">
+            <div class="step-title">Шаг 2 из 7: Выберите время</div>
+            <div class="time-slots" id="timeSlots"></div>
+            <div class="navigation">
+                <button class="nav-btn secondary" onclick="prevStep()">← Назад</button>
+                <button class="nav-btn primary" id="nextStep2" onclick="nextStep()" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Шаг 3: Объём -->
+        <div class="step" id="step3">
+            <div class="step-title">Шаг 3 из 7: Выберите объём</div>
+            <div class="options" id="volumeOptions"></div>
+            <div class="navigation">
+                <button class="nav-btn secondary" onclick="prevStep()">← Назад</button>
+                <button class="nav-btn primary" id="nextStep3" onclick="nextStep()" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Шаг 4: Эффект -->
+        <div class="step" id="step4">
+            <div class="step-title">Шаг 4 из 7: Выберите эффект</div>
+            <div class="options" id="effectOptions"></div>
+            <div class="navigation">
+                <button class="nav-btn secondary" onclick="prevStep()">← Назад</button>
+                <button class="nav-btn primary" id="nextStep4" onclick="nextStep()" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Шаг 5: Цвет -->
+        <div class="step" id="step5">
+            <div class="step-title">Шаг 5 из 7: Выберите цвет</div>
+            <div class="options" id="colorOptions"></div>
+            <div class="navigation">
+                <button class="nav-btn secondary" onclick="prevStep()">← Назад</button>
+                <button class="nav-btn primary" id="nextStep5" onclick="nextStep()" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Шаг 6: Изгиб -->
+        <div class="step" id="step6">
+            <div class="step-title">Шаг 6 из 7: Выберите изгиб</div>
+            <div class="options" id="curlOptions"></div>
+            
+            <div class="checkbox-group" id="expressCheckbox" onclick="toggleExpress()">
+                <input type="checkbox" id="express" class="checkbox">
+                <label for="express" style="cursor: pointer;">⚡️ Экспресс наращивание (за час)</label>
+            </div>
+            
+            <div class="navigation">
+                <button class="nav-btn secondary" onclick="prevStep()">← Назад</button>
+                <button class="nav-btn primary" id="nextStep6" onclick="nextStep()" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Шаг 7: Контактные данные -->
+        <div class="step" id="step7">
+            <div class="step-title">Шаг 7 из 7: Ваши контакты</div>
+            
+            <div class="form-group">
+                <label class="form-label">ФИО *</label>
+                <input type="text" class="form-input" id="fullName" placeholder="Иванова Мария Петровна">
+                <div class="error" id="nameError"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Телефон *</label>
+                <input type="tel" class="form-input" id="phone" placeholder="+7 (999) 123-45-67">
+                <div class="error" id="phoneError"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Комментарий (необязательно)</label>
+                <textarea class="form-input" id="comment" placeholder="Укажите дополнительную информацию..."></textarea>
+            </div>
+
+            <div class="summary">
+                <div class="summary-item">
+                    <span class="summary-label">📅 Дата:</span>
+                    <span class="summary-value" id="summaryDate"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">⏰ Время:</span>
+                    <span class="summary-value" id="summaryTime"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">💅 Объём:</span>
+                    <span class="summary-value" id="summaryVolume"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">✨ Эффект:</span>
+                    <span class="summary-value" id="summaryEffect"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">🎨 Цвет:</span>
+                    <span class="summary-value" id="summaryColor"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">💫 Изгиб:</span>
+                    <span class="summary-value" id="summaryСurl"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">⚡️ Экспресс:</span>
+                    <span class="summary-value" id="summaryExpress"></span>
+                </div>
+            </div>
+            
+            <div class="navigation">
+                <button class="nav-btn secondary" onclick="prevStep()">← Назад</button>
+                <button class="nav-btn primary" onclick="submitForm()">✅ Записаться</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.MainButton.hide();
+
+        // Данные формы
+        const formData = {
+            date: '',
+            time: '',
+            volume: '',
+            effect: '',
+            color: '',
+            curl: '',
+            express: false,
+            fullName: '',
+            phone: '',
+            comment: ''
+        };
+
+        // Текущий шаг
+        let currentStep = 1;
+        const totalSteps = 7;
+
+        // Календарь
+        let currentMonth = new Date();
+        let availableSlots = {};
+
+        // Данные для выбора
+        const volumes = ['1D', '1.5D', '2D', '2.5D', '3D', '4D', 'Ламинирование'];
+        const effects = [
+            'Натуральный', 'Куколка', 'Лисичка', 'Кукла-Лиса', 'Белочка',
+            'Американка', 'Аниме', 'Ким', 'Кайли', 'Барби', 'Mascara',
+            'Накладные ресницы', 'Стрелочка', 'Рваный', 'Мокрый', 'Лучики'
+        ];
+        const colors = ['Чёрные', 'Коричневые', 'Светло-коричневые', 'Цветные'];
+        const curls = ['C', 'C+', 'D', 'M', 'L', 'L+'];
+
+        // Инициализация
+        function init() {
+            generateAvailableSlots();
+            renderCalendar();
+            renderOptions();
+            updateProgress();
+        }
+
+        // Генерация доступных слотов (для демонстрации)
+        function generateAvailableSlots() {
+            const timeSlots = ['10:00', '12:00', '14:00', '16:00', '18:00'];
+            const today = new Date();
+            
+            for (let i = 0; i < 30; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() + i);
+                
+                // Пропускаем воскресенья
+                if (date.getDay() === 0) continue;
+                
+                const dateStr = formatDate(date);
+                availableSlots[dateStr] = timeSlots.map(time => ({
+                    time,
+                    available: Math.random() > 0.3 // 70% слотов доступны
+                }));
+            }
+        }
+
+        // Форматирование даты
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatDateRu(dateStr) {
+            const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                          'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+            const [year, month, day] = dateStr.split('-');
+            return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
+        }
+
+        // Отрисовка календаря
+        function renderCalendar() {
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            
+            // Заголовок
+            const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                              'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            document.getElementById('calendarMonth').textContent = `${monthNames[month]} ${year}`;
+            
+            // Сетка
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            // Дни недели
+            const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            dayNames.forEach(name => {
+                const dayName = document.createElement('div');
+                dayName.className = 'calendar-day-name';
+                dayName.textContent = name;
+                grid.appendChild(dayName);
+            });
+            
+            // Первый день месяца
+            const firstDay = new Date(year, month, 1);
+            let startDay = firstDay.getDay();
+            startDay = startDay === 0 ? 6 : startDay - 1; // Преобразуем к понедельнику
+            
+            // Пустые ячейки
+            for (let i = 0; i < startDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'calendar-day empty';
+                grid.appendChild(empty);
+            }
+            
+            // Дни месяца
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+            
+            for (let day = 1; day <= lastDay; day++) {
+                const date = new Date(year, month, day);
+                const dateStr = formatDate(date);
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'calendar-day';
+                dayDiv.textContent = day;
+                
+                // Проверяем доступность
+                if (date < today.setHours(0,0,0,0)) {
+                    dayDiv.classList.add('unavailable');
+                } else if (availableSlots[dateStr] && availableSlots[dateStr].some(s => s.available)) {
+                    dayDiv.classList.add('available');
+                    dayDiv.onclick = () => selectDate(dateStr);
+                } else {
+                    dayDiv.classList.add('unavailable');
+                }
+                
+                if (formData.date === dateStr) {
+                    dayDiv.classList.add('selected');
+                }
+                
+                grid.appendChild(dayDiv);
+            }
+        }
+
+        // Изменение месяца
+        function changeMonth(delta) {
+            currentMonth.setMonth(currentMonth.getMonth() + delta);
+            renderCalendar();
+        }
+
+        // Выбор даты
+        function selectDate(dateStr) {
+            formData.date = dateStr;
+            renderCalendar();
+            
+            // Показываем временные слоты
+            const slots = availableSlots[dateStr];
+            const container = document.getElementById('timeSlots');
+            container.innerHTML = '';
+            
+            slots.forEach(slot => {
+                const slotDiv = document.createElement('div');
+                slotDiv.className = 'time-slot';
+                if (!slot.available) slotDiv.classList.add('unavailable');
+                slotDiv.textContent = slot.time;
+                
+                if (slot.available) {
+                    slotDiv.onclick = () => selectTime(slot.time);
+                }
+                
+                if (formData.time === slot.time) {
+                    slotDiv.classList.add('selected');
+                }
+                
+                container.appendChild(slotDiv);
+            });
+            
+            document.getElementById('nextStep1').disabled = false;
+        }
+
+        // Выбор времени
+        function selectTime(time) {
+            formData.time = time;
+            document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
+            event.target.classList.add('selected');
+            document.getElementById('nextStep2').disabled = false;
+        }
+
+        // Отрисовка опций
+        function renderOptions() {
+            renderOptionButtons('volumeOptions', volumes, 'volume', 3);
+            renderOptionButtons('effectOptions', effects, 'effect', 4);
+            renderOptionButtons('colorOptions', colors, 'color', 5);
+            renderOptionButtons('curlOptions', curls, 'curl', 6);
+        }
+
+        function renderOptionButtons(containerId, options, field, step) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            options.forEach(option => {
+                const btn = document.createElement('div');
+                btn.className = 'option-btn';
+                btn.textContent = option;
+                btn.onclick = () => selectOption(field, option, step);
+                
+                if (formData[field] === option) {
+                    btn.classList.add('selected');
+                }
+                
+                container.appendChild(btn);
+            });
+        }
+
+        // Выбор опции
+        function selectOption(field, value, step) {
+            formData[field] = value;
+            renderOptions();
+            document.getElementById(`nextStep${step}`).disabled = false;
+        }
+
+        // Переключение экспресс
+        function toggleExpress() {
+            const checkbox = document.getElementById('express');
+            checkbox.checked = !checkbox.checked;
+            formData.express = checkbox.checked;
+            
+            const container = document.getElementById('expressCheckbox');
+            if (checkbox.checked) {
+                container.classList.add('checked');
+            } else {
+                container.classList.remove('checked');
+            }
+        }
+
+        // Навигация
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                currentStep++;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+                updateProgress();
+                
+                if (currentStep === 7) {
+                    updateSummary();
+                }
+                
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                currentStep--;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+                updateProgress();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function updateProgress() {
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+
+        // Обновление сводки
+        function updateSummary() {
+            document.getElementById('summaryDate').textContent = formatDateRu(formData.date);
+            document.getElementById('summaryTime').textContent = formData.time;
+            document.getElementById('summaryVolume').textContent = formData.volume;
+            document.getElementById('summaryEffect').textContent = formData.effect;
+            document.getElementById('summaryColor').textContent = formData.color;
+            document.getElementById('summaryСurl').textContent = formData.curl;
+            document.getElementById('summaryExpress').textContent = formData.express ? 'Да' : 'Нет';
+        }
+
+        // Валидация и отправка
+        function submitForm() {
+            const fullName = document.getElementById('fullName').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const comment = document.getElementById('comment').value.trim();
+            
+            let isValid = true;
+            
+            // Валидация ФИО
+            if (!fullName || fullName.length < 3) {
+                document.getElementById('nameError').textContent = 'Введите корректное ФИО';
+                isValid = false;
+            } else {
+                document.getElementById('nameError').textContent = '';
+            }
+            
+            // Валидация телефона
+            const phoneRegex = /^[\d\s\+\-\(\)]+$/;
+            if (!phone || phone.length < 10 || !phoneRegex.test(phone)) {
+                document.getElementById('phoneError').textContent = 'Введите корректный номер телефона';
+                isValid = false;
+            } else {
+                document.getElementById('phoneError').textContent = '';
+            }
+            
+            if (!isValid) return;
+            
+            formData.fullName = fullName;
+            formData.phone = phone;
+            formData.comment = comment;
+            
+            // Отправка данных в Telegram
+            tg.sendData(JSON.stringify(formData));
+            tg.close();
+        }
+
+        // Запуск
+        init();
+    </script>
+</body>
+</html>
